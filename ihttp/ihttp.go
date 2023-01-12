@@ -2,6 +2,7 @@
 package ihttp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -22,7 +23,8 @@ import (
 
 // Handler is the struct that implements the http.Handler interface.
 type Handler struct {
-	Log logr.Logger
+	Log   logr.Logger
+	Patch []byte
 }
 
 // ListenAndServe is a patterned after http.ListenAndServe.
@@ -97,6 +99,18 @@ func (s Handler) Handle(w http.ResponseWriter, req *http.Request) {
 
 		return
 	}
+
+	if len(s.Patch) > len(binary.MagicString) {
+		log.Info("patch string is too long, ignoring")
+	} else if len(s.Patch) > 0 {
+		index := bytes.Index(file, binary.MagicString)
+		if index >= 0 {
+			copy(file[index:], s.Patch)
+		} else {
+			log.Info("patch string not found, ignoring")
+		}
+	}
+
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(file)))
 	if req.Method == http.MethodGet {
 		b, err := w.Write(file)
