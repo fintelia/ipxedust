@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/tinkerbell/ipxedust/binary"
@@ -105,27 +106,18 @@ func (s Handler) Handle(w http.ResponseWriter, req *http.Request) {
 	} else if len(s.Patch) > 0 {
 		index := bytes.Index(file, binary.MagicString)
 		if index >= 0 {
-			copy(file[index:], s.Patch)
+		copy(file[index:], s.Patch)
 		} else {
 			log.Info("patch string not found, ignoring")
 		}
 	}
 
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(file)))
+	http.ServeContent(w, req, filename, time.Now(), bytes.NewReader(file))
 	if req.Method == http.MethodGet {
-		b, err := w.Write(file)
-		if err != nil {
-			log.Error(err, "error serving file")
-			w.WriteHeader(http.StatusInternalServerError)
-			span.SetStatus(codes.Error, err.Error())
-
-			return
-		}
-		log.Info("file served", "bytesSent", b, "fileSize", len(file))
+		log.Info("file served", "name", filename, "fileSize", len(file))
 	} else if req.Method == http.MethodHead {
 		log.Info("HEAD method requested", "fileSize", len(file))
 	}
-	span.SetStatus(codes.Ok, filename)
 }
 
 // extractTraceparentFromFilename takes a context and filename and checks the filename for
